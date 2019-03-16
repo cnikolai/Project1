@@ -10,6 +10,9 @@ var mainApp = {};
     countryCode = "us";
     let uidState = false;
     deBugger = true;
+    var geocoder = new google.maps.Geocoder();
+    // var lat = '';
+    // var lng = '';
 
     firebase.auth().onAuthStateChanged(function (user) {
         if (user) {
@@ -50,10 +53,82 @@ var mainApp = {};
 
     function displayName(){
 
-        var newDiv = $("<div>");
-        newDiv.append("Welcome " + userName + " Your Zipcode is " + postal);
+        var newDiv = $("<div id='welcome'>");
+        newDiv.text("Welcome " + userName + " Your Zipcode is " + postal);
         $(".mainContent").append(newDiv);
+        var space = $("<br><br>");
+        $("#welcome").append(space);
 
+    }
+
+    $('#googlePlaces').click(function(){ loadSearch(); return false; });
+
+    // loads the search into the main content div
+    function loadSearch() {
+        var searchInput = $("<input type='text' name='searchfield'>");
+        $("#welcome").append(searchInput);
+        var space = $("<br><br>");
+        $("#welcome").append(space);
+        var searchButton = $("<button id='placessearch' type='button'>Search</button>");
+        $("#welcome").append(searchButton);
+    }
+
+    $(document).on("click","#placessearch", function () { 
+        var latlng = convertZiptoLatLong();
+
+        
+        //getPlaces();
+    });
+
+
+    //uses link #2
+    function getPlaces() {
+        // var lat = "";
+        // var lng = "";
+        // var latlng = convertZiptoLatLong().then(function (){
+        //     console.log("here1");
+        // });
+        // if (deBugger) {
+            // console.log("latlong",latlng);
+            // console.log('Latitude: ' + latlng.lat + ' Logitude: ' + latlng.lng);
+        // }
+        var placesAPIKey = 'AIzaSyD2fMFXXjaU_--ubFbg8T6rLWaju98eAeI';
+        // var forecastDays = 5;
+        // var queryURL = 'https://maps.googleapis.com/maps/api/place/nearbysearch/json' + weatherAPIKey + '&q=' + postal + '&days=' + forecastDays;
+        // $.ajax({
+        //     url: queryURL,
+        //     method: "GET"
+
+        // }).then(function (placesResponse) {
+        //     console.log("Weather object", weatherResponse.forecast.forecastday);
+        //     displayPlaces(placesResponse);
+        // });
+    }
+
+    function convertZiptoLatLong() {
+        var lat = '';
+        var lng = '';
+        var address = postal;
+        geocoder.geocode( { 'address': address}, function(results, status) {
+        if (status == google.maps.GeocoderStatus.OK) {
+            lat = results[0].geometry.location.lat();
+            lng = results[0].geometry.location.lng();
+            var latlng = {lat, lng};
+            console.log("latlng: ", latlng);
+            return latlng;
+            //alert('Latitude: ' + lat + ' Logitude: ' + lng);
+        } else {
+            console.log("Geocode was not successful for the following reason: " + status);
+        }
+        });
+        // if (deBugger) {
+        //     console.log('Latitude: ' + lat + ' Logitude: ' + lng);
+        // }
+    }
+
+    function sleep(delay) {
+        var start = new Date().getTime();
+        while (new Date().getTime() < start + delay);
     }
 
     function getWeather() {
