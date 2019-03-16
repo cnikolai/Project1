@@ -80,6 +80,51 @@ var mainApp = {};
         //getPlaces();
     });
 
+    function convertZiptoLatLong() {
+        var lat = '';
+        var lng = '';
+        var address = postal;
+        geocoder.geocode( { 'address': address}, function(results, status) {
+        if (status == google.maps.GeocoderStatus.OK) {
+            lat = results[0].geometry.location.lat();
+            lng = results[0].geometry.location.lng();
+            var latlng = {lat, lng};
+            console.log("latlng: ", latlng);
+            // call google places here
+            googlePlaces(latlng);
+
+        } else {
+            console.log("Geocode was not successful for the following reason: " + status);
+        }
+        });
+        // if (deBugger) {
+        //     console.log('Latitude: ' + lat + ' Logitude: ' + lng);
+        // }
+    }
+
+    function googlePlaces(latlng) {
+        // googlePlaces
+        console.log(latlng);
+        
+        let baseUrl = 'https://maps.googleapis.com/maps/api/place/nearbysearch/json';
+        let apiKey = 'AIzaSyD2fMFXXjaU_--ubFbg8T6rLWaju98eAeI';
+        const keys = {
+            location:`${latlng.lat},${latlng.lng}`,
+            radius: 500,
+            types: 'cafe',
+            key: apiKey
+        };
+        $.ajax({
+            url: `${baseUrl}?location=${keys.location}&radius=${keys.radius}&types=${keys.types}&key=${keys.key}`,
+            method: "GET"
+
+        }).then(function (data) {
+            console.log(data);
+            
+        });
+        //https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=34.1103407,-118.25850960000002&radius=500&types=cafe&key=AIzaSyD2fMFXXjaU_--ubFbg8T6rLWaju98eAeI
+    }
+
 
     //uses link #2
     function getPlaces() {
