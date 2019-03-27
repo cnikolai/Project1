@@ -8,29 +8,35 @@ var mainApp = {};
     var userName = "";
     var postal = "";
     countryCode = "us";
+    let userEmail = "";
+    let userPw = "";
     let uidState = false;
+    let uidKey;
     deBugger = true;
     var geocoder = new google.maps.Geocoder();
 
     firebase.auth().onAuthStateChanged(function (user) {
         if (user) {
             // Run once the User is signed in.
+            delayLoader();
             if(deBugger){
                 console.log(user);
             };
             uid = user.uid;
             userName = user.displayName;
 
-            myAccount("");
+            //functions to execute upon page load
+            setUser();
+            myAccount(userName);
             zipChange();
-            keyFinder();
+
             //delay necessary due to the time it takes for the other functions to run
             setTimeout(() => {
                 displayName();
                 zreturn();
                 getWeather();
-              getNews();
-            }, 1000);
+                getNews();
+            }, 1500);
 
         } else {
             //no user signed in
@@ -53,50 +59,74 @@ var mainApp = {};
 
         var newDiv = $("<div>");
         newDiv.attr("id", "welcome");
-        newDiv.text("Welcome " + userName + " Your Zipcode is " + postal);
+        newDiv.text("Welcome " + userName + " the zip code you are viewing is " + postal);
         $(".mainContent").append(newDiv);
         var space = $("<br><br>");
         $("#welcome").append(space);
         var contentDiv = $("<div>");
         contentDiv.attr("id", "main-content");
         $("#welcome").append(contentDiv);
-
     }
+
+
 
     $('#ticketmaster').click(function(){ loadSearch(); return false; });
 
     // loads the search into the main content div
     function loadSearch() {
         $("#welcome").empty();
-        var searchInput = $("<input type='text' name='searchfield'>");
-        $("#welcome").append(searchInput);
+        var form = $("<form>");
+        var userInstructions = $("<div>Enter a keyword to search on</div>");
+        $("#welcome").append(form);
+        form.append(userInstructions);
+        var searchInput = $("<input type='text' id='ticketmasterkeywordsearchfield'>");
+        form.append(searchInput);
         var space = $("<br><br>");
-        $("#welcome").append(space);
-        var searchButton = $("<button id='ticketmastersearch' type='button'>Search</button>");
-        $("#welcome").append(searchButton);
+        form.append(space);
+        var searchButton = $("<button id='ticketmastersearch' type='submit'>Search</button>");
+        form.append(searchButton);
     }
 
-    $(document).on("click","#ticketmastersearch", function () { 
-        convertZiptoLatLong();
+    $(document).on("click","#ticketmastersearch", function () {
+        var ticketmaster = true;
+        convertZiptoLatLong(ticketmaster, function(){});
     });
 
-    function convertZiptoLatLong() {
+    function convertZiptoLatLong(ticketmaster, callbackfunction) {
         var lat = '';
         var lng = '';
-        var address = postal;
-        geocoder.geocode( { 'address': address}, function(results, status) {
-        if (status == google.maps.GeocoderStatus.OK) {
-            lat = results[0].geometry.location.lat();
-            lng = results[0].geometry.location.lng();
-            var latlng = {lat, lng};
-            if (deBugger) {
-                console.log("latlng: ", latlng);
+        // var address = postal;
+        // geocoder.geocode( { 'address': address}, function(results, status) {
+        // if (status == google.maps.GeocoderStatus.OK) {
+        //     lat = results[0].geometry.location.lat();
+        //     lng = results[0].geometry.location.lng();
+        //     var latlng = {lat, lng};
+        //     if (deBugger) {
+        //         console.log("latlng: ", latlng);
+        //     }
+        //     // call ticketmaster here
+
+        var geoKey = "QNsATavzcxyMxvtmbBmg8rPQRBynQnGA";
+        var geocodeURL = "https://www.mapquestapi.com/geocoding/v1/address?key=" + geoKey + "&location=" + postal;
+
+        $.ajax({
+          url: geocodeURL,
+          method: "GET"
+        }).then( function (georesponse){
+          console.log("geo", georesponse.results[0].locations[0].latLng);
+
+          var latlng = georesponse.results[0].locations[0].latLng;
+          // var latlng = {geoLatLngResponse.lat, geoLatLngResponse.lng};
+        // });
+            if (ticketmaster){
+              getTicketmasterEvents(latlng);
+            } else {
+              callbackfunction(latlng);
             }
-            // call ticketmaster here
-            getTicketmasterEvents(latlng);
-        } else {
-            console.log("Geocode was not successful for the following reason: " + status);
-        }
+        //
+        // } else {
+        //     console.log("Geocode was not successful for the following reason: " + status);
+        // }
         });
     }
 
@@ -105,7 +135,7 @@ var mainApp = {};
         if (deBugger) {
            console.log(latlng);
         }
-        
+
         let baseUrl = 'https://maps.googleapis.com/maps/api/place/nearbysearch/json';
         let apiKey = 'AIzaSyD2fMFXXjaU_--ubFbg8T6rLWaju98eAeI';
         const keys = {
@@ -119,7 +149,7 @@ var mainApp = {};
             method: "GET"
 
         }).then(function (data) {
-            console.log(data);    
+            console.log(data);
         });
         //https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=34.1103407,-118.25850960000002&radius=500&types=cafe&key=AIzaSyD2fMFXXjaU_--ubFbg8T6rLWaju98eAeI
     }
@@ -132,11 +162,18 @@ var mainApp = {};
         //https://developer.ticketmaster.com/api-explorer/v2/
         //SB: 41.7132821, -86.21076719999996
         //LA: 4.1103407,-118.25850960000002
-        
+
         //https://app.ticketmaster.com/discovery/v2/events?apikey=BHuf4uL2WnsQL8kxNUsmYVVLnoKKAAE9&latlong=41.7132821,-86.21076719999996&radius=115&unit=miles&page=1&sort=name,date,asc&countryCode=US
-        //TODO: have user put key in search field and search for that
+
+        //var keyword = $("#ticketmasterkeywordsearchfield").val().trim().replace(/\s/g,'%20');
+        var keyword = $("#ticketmasterkeywordsearchfield").val();
+        if (deBugger) {
+            console.log("keyword", keyword);
+            //https://app.ticketmaster.com/discovery/v2/events?apikey=BHuf4uL2WnsQL8kxNUsmYVVLnoKKAAE9&keyword=basketball%20field&countryCode=US
+        }
+        //TODO: have user put key in search field and search for that - stuck on multi-keyword entries.
         //TODO: display all results on a page - display more result items like picture, etc
-        //TODO: what if you have more than 20 results? pages
+        //TODO: what if you have more than 20 results? &page= (look at page information at the top) - make a arrow container
         //TODO: make it all fit in the height of the maincontent tag
         let baseUrl = 'https://app.ticketmaster.com/discovery/v2/events';
         let apiKey = 'BHuf4uL2WnsQL8kxNUsmYVVLnoKKAAE9';
@@ -146,50 +183,61 @@ var mainApp = {};
             unit: "miles",
             pages: 1,
             key: apiKey,
+            keyword: keyword,
             sort: "name,date,asc",
             countryCode: "US"
         };
         if (deBugger) {
-            console.log(`${baseUrl}?apikey=${keys.key}&latlong=${keys.latlong}&radius=${keys.radius}&unit=${keys.unit}&pages=${keys.pages}&sort=${keys.sort}&countryCode=${keys.countryCode}`);
+            //console.log(`${baseUrl}?apikey=${keys.key}&latlong=${keys.latlong}&radius=${keys.radius}&unit=${keys.unit}&pages=${keys.pages}&sort=${keys.sort}&keyword=${keys.keyword}&countryCode=${keys.countryCode}`);
+            console.log(`${baseUrl}?apikey=${keys.key}&keyword=${keys.keyword}`);
         }
         $.ajax({
-            url: `${baseUrl}?apikey=${keys.key}&latlong=${keys.latlong}&radius=${keys.radius}&unit=${keys.unit}&pages=${keys.pages}&sort=${keys.sort}&countryCode=${keys.countryCode}`,
+            //url: `${baseUrl}?apikey=${keys.key}&latlong=${keys.latlong}&radius=${keys.radius}&unit=${keys.unit}&pages=${keys.pages}&sort=${keys.sort}&keyword=${keys.keyword}&countryCode=${keys.countryCode}`,
+            url: `${baseUrl}?apikey=${keys.key}&keyword=${keys.keyword}&radius=${keys.radius}&sort=${keys.sort}`,
             method: "GET"
         }).then(function (data) {
             if (deBugger) {
                 console.log(data);
-                console.log(data._embedded.events[0].name);
+                //console.log(data._embedded.events[0].name);
             }
             displyTicketmasterResults(data);
         });
     }
 
+
+    //TODO: see what page we are on.  calculate total number of pages.  if there are more events, display a right chevron.  if we are on page > 0, diesplay a left chevron.
+    //TODO: when click on the event, then display details and have a back button as well.
+    //when a left chevron is clicked, go to the previous page, when a right chevron is clicked, go to the next page.
     function displyTicketmasterResults(results) {
         $("#welcome").empty();
         //results._embedded.events gives an array, so stuff in results is an array and should be accessed with results[i]
+        //alert(typeof results._embedded)
+        if (typeof results._embedded === "undefined") {
+            if (deBugger) {
+                console.log("There are no results for this search term.");
+            }
+            var ticketmasterDiv = $("<div>");
+            ticketmasterDiv.text("There are no results for this search term.")
+            $("#welcome").append(ticketmasterDiv);
+        }
+        else {
       var results = results._embedded.events;
 
       // Creating weather wrapper to overwrite HTML every time new zip is made
-      let ticketmasterWrapper = $("<div/>");
-      //ticketmasterDiv Styling
-      ticketmasterWrapper.css({
-        //"width": "calc(100% - 50px)",
-        "margin": "5px",
-        //"display": "grid",
-        "text-align": "left",
-        //"justify-items": "left",
-    });
-
+      let ticketmasterWrapper = $("<div>");
       ticketmasterWrapper.addClass("ticketmaster-wrapper");
-      // Boostrap card deck so the weather cards line up horizontally
+      // Boostrap card
       ticketmasterWrapper.addClass("card");
       ticketmasterWrapper.addClass("text-success");
 
       // Card header
       let ticketmasterEventsTextDiv = $("<div/>");
       ticketmasterEventsTextDiv.addClass("card-header");
-      ticketmasterEventsTextDiv.text("Ticketmaster Events Near You");
+      ticketmasterEventsTextDiv.html("<strong>Ticketmaster Events Near You</strong>");
       ticketmasterWrapper.append(ticketmasterEventsTextDiv);
+      //TODO: need a wrapper div like below
+      var rightChevron = $("<span class='right-chevron glyphicon glyphicon-chevron-right' data-page='0'></span>");
+      var leftChevron = $("<span class='left-chevron glyphicon glyphicon-chevron-left' data-page='0'></span>");
 
       let resultsList = $("<ul>");
       resultsList.addClass("list-group");
@@ -201,9 +249,34 @@ var mainApp = {};
         var listItemDiv = $("<li>");
         listItemDiv.addClass("list-group-item");
         listItemDiv.attr("id", "ticketmaster-event-" + i);
+
+
         // Display the name of the event
-        listItemDiv.text(results[i].name);
-  
+
+        var nameDiv = $("<div>");
+        nameDiv.attr("id", "ticketmaster-name-div");
+        nameDiv.text(results[i].name);
+        listItemDiv.append(nameDiv);
+
+        var wrapperDiv = $("<div>");
+        wrapperDiv.attr("id", "ticketmaster-date-and-venue-wrapper-div");
+        listItemDiv.append(wrapperDiv);
+
+        // Display the date of the event
+        var dateDiv = $("<div>");
+        dateDiv.attr("id", "ticketmaster-date-div");
+        dateDiv.text(results[i].dates.start.localDate);
+        wrapperDiv.append(dateDiv);
+
+        // Display the venue of the event
+        var venueDiv = $("<div>");
+        venueDiv.attr("id", "ticektmaster-venue-div");
+        venueDiv.text(results[i]._embedded.venues[0].name);
+        wrapperDiv.append(venueDiv);
+
+
+        //listItemDiv.text(results[i].name)
+
         // populate the ticketmasterWrapper
         ticketmasterWrapper.append(listItemDiv);
       }
@@ -211,6 +284,7 @@ var mainApp = {};
       // overwrite main content div
       $("#welcome").append(ticketmasterWrapper);
       console.log("Ticket Event Updated");
+    }
     }
 
 
@@ -277,7 +351,7 @@ var mainApp = {};
         // Display wind speed
         // weatherDiv.append("<p class=weather-info> Wind Speed: " + parseInt(results[i].day.maxwind_mph) + "mph </p>");
         // // Weather condition
-  
+
         // populate the weatherWrapper
         weatherWrapper.append(weatherDiv);
       }
@@ -343,37 +417,125 @@ var mainApp = {};
     }
 
 
-    // Job search api
-    // $(document).on("click", "#job-search-button", function(){
-    //   console.log("Job Search clicked!");
-    //
-    //   var jobSearchDiv = $("<div>");
-    //   jobSearchDiv.text("text was successful");
-    //
-    //   $("#main-content").append(jobSearchDiv);
-    // });
+    // Mapquest points of interest
+    $(document).on("click", "#points-of-interest", function(){
+      $("#welcome").empty();
 
+      // Search box and button for place of interests
+      var mapSearchDiv = $("<div>");
+      mapSearchDiv.attr("id", "map-search-div");
+      mapSearchDiv.text("Enter some place to search for");
+      var breakLine = $("<br>");
+      mapSearchDiv.append(breakLine);
+      $("#welcome").append(mapSearchDiv);
+      var mapSearchBox = $("<input>");
+      mapSearchBox.attr("id", "map-search-box");
+      mapSearchDiv.append(mapSearchBox);
+      var mapSearchButton = $("<button>");
+      mapSearchButton.attr("id", "map-search-button");
+      mapSearchButton.text("Search");
+      mapSearchDiv.append(mapSearchButton);
+
+      makeMapDiv();
+
+    });
+
+    function makeMapDiv(){
+      var mapDiv = $("<div>");
+      mapDiv.attr("id", "map");
+      $("#welcome").append(mapDiv);
+    }
+
+    $(document).on("click", "#map-search-button", function(){
+        // So ticketmaster doesn't get triggers
+        var ticketmaster = false;
+        // get rid of any map already on the page so we can get ready for a new one
+        $("#map").remove();
+        makeMapDiv();
+        convertZiptoLatLong(ticketmaster, getPointsOfInterest);
+    });
+
+    function getPointsOfInterest(latlng){
+      var apiKeyMapSearch = "Zo2ZmNO0bAEQ22WrffsasBZg6BgcAXkm";
+      var pointSearch = $("#map-search-box").val();
+      var mapQueryUrl = "https://api.tomtom.com/search/2/poiSearch/"+ pointSearch +".json?&limit=20countrySet=US&lat=" + latlng.lat + "&lon=" + latlng.lng + "&radius=32187&key="+ apiKeyMapSearch;
+
+
+      $.ajax({
+          url: mapQueryUrl,
+          method: "GET"
+
+      }).then(function (mapquestResponse) {
+        if(deBugger){
+          console.log("Points of interest object", mapquestResponse);
+        }
+
+          // API key for mapquest
+          L.mapquest.key = "2oBp4gFXVpa5qgpXo2Dt3XWVAFlGt13M";
+
+          var map = L.mapquest.map('map', {
+          center: [latlng.lat, latlng.lng],
+          // center: [34.17490, -118.61527],
+          layers: L.mapquest.tileLayer('map'),
+          zoom: 12
+          });
+
+          for(var i=0; i<mapquestResponse.results.length; i++){
+            L.marker([mapquestResponse.results[i].position.lat, mapquestResponse.results[i].position.lon], {
+            icon: L.mapquest.icons.marker(),
+            draggable: false
+          }).bindPopup(mapquestResponse.results[i].poi.name + "<br>" + mapquestResponse.results[i].address.freeformAddress).addTo(map);
+          }
+
+
+      });
+    }
 
     // sets placeholder as your zip
         let zreturn = () => {
-            console.log(postal);
+            console.log("Z RETURN HAS RUN AND THE POSTAL CODE IS : " + postal);
             $('.zip-input').attr("placeholder", "Current Zip: " + postal);
+            $(".zip-input").css("font-size", "12px");
         }
 
 
     // set postal as a temp variable
     let zipChange = () => {
+        // for clicking the change zipcode button
+        let zinput = $(".zip-input");
         $(".zip-btn").on("click", function() {
-            let zi = $(".zip-input").val().trim();
+            if(zinput.val().length === 5){
+                let zi = zinput.val().trim();
                 postal = zi;
-                getWeather();
-                getNews();
-                $("#welcome").remove();
-                displayName();
+                zinput.val("");
+               refresh();
                 if (deBugger){
                     console.log(postal);
                 }
+            }
         });
+        // for pressing enter inside the zipcode input
+        zinput.on("keypress", function(e) {
+            if(e.which == 13 && zinput.val().length === 5){
+                e.preventDefault();
+                let zi = zinput.val().trim();
+                postal = zi;
+                zinput.val("");
+                refresh();
+                if (deBugger){
+                    console.log(postal);
+                }
+            }
+        });
+    }
+
+    //function to refresh weather, news, welcome
+    let refresh = () => {
+        getWeather();
+        getNews();
+        zreturn();
+        $("#welcome").remove();
+        displayName();
     }
 
     //error function to display prompt
@@ -396,71 +558,67 @@ var mainApp = {};
             "z-index": "100",
             "width": "600px",
             "height": "200px",
-            "background-color": "red",
             "color": "black",
-            "font-family": "Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif",
             "font-weight": "bolder",
-            "border": "5px inset black",
-            "border-radius": "10px",
+            "border-radius": "15px 50px 30px",
             "font-size": "30px",
-            "text-align": "center"
+            "text-align": "center",
+            "box-shadow": "0 5px 40px 2px rgba(155,155,155,1)",
+            "background-color": "rgba(255, 255, 255, .9)",
+            "font-family": "Arial, Helvetica, sans-serif;",
+            "border": "3px rgba(74, 170, 165, .9) solid",
+            "padding": "10px",
         });
         let tempP = $("<p/>");
         let close = $("<div/>");
-        close.text("X");
+        close.text("x");
         close.css({
             "position": "absolute",
-            "top": "0",
-            "right": "10px",
-            "font-family": "Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif",
-            "font-weight": "bolder",
+            "top": "10px",
+            "right": "20px",
+            "font-family": "Arial, Helvetica, sans-serif",
+            "font-weight": "bold",
             "font-size": "50px",
             "color": "black",
             "width": "50px",
             "height": "50px"
         });
-        close.attr("id", "close");
+        close.attr("id", "exit");
         tempP.text(id);
-        temp.append(tempP).append(close);
+        temp.append("<div>Error:</div>").append(tempP).append(close);
         tempW.append(temp);
-        $("body").append(tempW).on("click", "#close", function () {
+
+        let h = $("html");
+        h.append(tempW);
+        h.on("click", "#exit", function () {
             $(this).parent().parent().remove();
         });
     }
 
-
-    // push zipcode and UID to db
-    let pushDB = () => {
-        dbr.push({
-            uid,
-            postal,
+    //sets uid as child element in db and saves the zipcode if it hasn't been saved already
+    let setUser = () => {
+        dbr.on("value", (snap) => {
+            if(snap.hasChild(uid)){
+                db.ref(uid).on("value", (s) => {
+                    let ptemp = s.val().postal;
+                    if(ptemp.length == 5){
+                        postal = ptemp;
+                        console.log("Logged Zip: " + ptemp);
+                    }
+                    else{
+                        pullPostal();
+                    }
+                });
+            }
+            else{
+                pullPostal();
+                setTimeout(() => {
+                    db.ref(uid).set({
+                        postal,
+                    });
+                }, 1000);
+            }
         });
-    }
-
-    // finds key to current UID
-    let keyFinder = () => {
-        dbr.orderByChild("uid").equalTo(uid).on("value", (snap) => {
-            snap.forEach((child) => {
-                let uidKey = child.key;
-                console.log("this is the UID Key: " + uidKey);
-                console.log("Zipcode pulled from Firebase DB");
-                uidState = true;
-                postal = child.val().postal;
-            });
-        });
-        setTimeout(() => {
-            dbKeyChecker();
-        }, 500);
-    }
-
-    // checks if youre in the db already
-    let dbKeyChecker = () => {
-        if(!uidState){
-            pullPostal();
-            setTimeout(() => {
-                pushDB();
-            }, 500);
-        }
     }
 
     //capture the users IP address and utilize it to pull news and weather
@@ -475,6 +633,26 @@ var mainApp = {};
         }, "jsonp");
     }
 
+    let delayLoader = () => {
+        let s = $(".splash");
+        let body = $(".b");
+        setTimeout(() => {
+            s.fadeOut(1500);
+        }, 500);
+
+        body.fadeIn(2000).css({
+            "pointer-events": "none",
+        });
+        setTimeout(() => {
+            body.css({
+                "pointer-events": "auto",
+                "opacity": "1",
+            });
+        }, 2000);
+    }
+
+
+    //open modal when clicking my account
     let myAccount = (id) => {
         $("#myAccount").on("click", function () {
             let body = $("nav, section, footer");
@@ -484,17 +662,24 @@ var mainApp = {};
             });
             let tempW = $("<div/>");
             tempW.css({
-               
+
                 "pointer-events": "auto",
                 "position": "absolute",
-                "top": "calc(50% - 200px)",
-                "left": "calc(50% - 400px)",
+                "top": "calc(50% - 225px)",
+                "left": "calc(50% - 425px)",
+                "width": "850px",
+                "height": "450px",
+                "box-shadow": "0 5px 40px 2px rgba(155,155,155,1)",
+                "background-color": "rgba(102, 102, 102, .85)",
+                "border-radius": "15px 50px 30px",
                 "opacity": "1",
             });
-            
-            tempW.addClass("error");
+
+            tempW.addClass("account");
             let temp = $("<div/>");
             temp.css({
+                "top": "calc(50% - 200px)",
+                "left": "calc(50% - 400px)",
                 "position" : "relative",
                 "display": "grid",
                 "justify-items": "center",
@@ -502,17 +687,132 @@ var mainApp = {};
                 "z-index": "99",
                 "width": "800px",
                 "height": "400px",
-                "background-color": "rgba(75, 170, 165, .9)",
+                "padding": "30px",
+                "border-radius": "0",
+                "box-shadow": "0 5px 40px 2px rgba(155,155,155,1)",
+                "background-color": "rgba(255, 255, 255, .9)",
                 "color": "black",
                 "font-family": "Arial, Helvetica, sans-serif;",
                 "font-weight": "bolder",
-                "border": "2px inset grey",
-                "border-radius": "10px",
+                "border": "3px rgba(74, 170, 165, .9) solid",
                 "font-size": "30px",
                 "text-align": "center"
             });
-            let tempP = $("<p/>");
+            let b = $("body");
+            let tempH = $("<h2/>");
+            let tempD = $("<div/>");
             let close = $("<div/>");
+            let pdiv = $("<div/>");
+            let idiv = $("<div/>");
+            let img = $("<img/>");
+            let email = $("<input/>");
+            let zip = $("<input/>");
+            let oldpw = $("<input/>");
+            let newpw = $("<input/>");
+            let sub = $("<button> Update </button>");
+            tempH.text("My Accounts Settings for " + id);
+            tempD.css({
+                "display": "grid",
+                "grid-template-columns": "1fr 2fr",
+                "grid-template-rows": "90%",
+                "grid-gap": "10px",
+                "width": "100%",
+                "height": "100%",
+            });
+            img.attr(
+                'src', "assets/img/unknownProfile.jpg").css({
+                "width": "200px",
+                "height": "200px",
+            });
+            pdiv.css({
+                "grid-row": "1/1",
+                "grid-column": "1/1",
+                "justify-self": "center",
+                "align-self": "center",
+            }).append(img);
+            email.attr({
+                "type": "email",
+                "placeholder": "   example@email.com",
+                "id": "email-update"
+            }).css({
+                "font-size": "15px",
+                "color": "rgba(74, 170, 165, .9)",
+                "width": "400px",
+                "height": "30px",
+                "outline": "none",
+            });
+            oldpw.attr({
+                "type": "text",
+                "placeholder": "   Old Password",
+                "id": "old-pw",
+            }).css({
+                "font-size": "15px",
+                "color": "rgba(74, 170, 165, .9)",
+                "width": "400px",
+                "height": "30px",
+                "outline": "none",
+            });
+            newpw.attr({
+                "type": "text",
+                "placeholder": "   New Password",
+                "id": "pw-update",
+            }).css({
+                "font-size": "15px",
+                "color": "rgba(74, 170, 165, .9)",
+                "width": "400px",
+                "height": "30px",
+                "outline": "none",
+            });
+            zip.attr({
+                "type": "text",
+                "maxlength": "5",
+                "id": "zip-update",
+                "placeholder": "   " + postal,
+            }).css({
+                "font-size": "15px",
+                "color": "rgba(74, 170, 165, .9)",
+                "width": "400px",
+                "height": "30px",
+                "outline": "none",
+            });
+            sub.attr({
+                "type": "submit",
+                "id": "account-update",
+            }).css({
+                "box-shadow": "0 5px 10px 2px rgba(155,155,155,1)",
+                "background-color": "rgba(255, 255, 255, .9)",
+                "color": "black",
+                "font-family": "Arial, Helvetica, sans-serif;",
+                "font-weight": "bolder",
+                "border": "3px rgba(74, 170, 165, .9) solid",
+                "border-radius": "15px 50px 30px",
+                "font-size": "15px",
+                "margin": "10px 0 10px auto",
+                "width": "100px",
+                "height": "35px",
+                "display": "block",
+                "text-align": "center",
+                "outline": "none",
+            });
+            idiv.css({
+                "grid-row": "1/1",
+                "grid-column": "2/2",
+                "justify-self": "left",
+                "align-self": "center",
+                "text-align": "left",
+                "font-family": "Arial, Helvetica, sans-serif;",
+                "font-weight": "bold",
+                "font-size": "15px",
+                "margin": "20px auto"
+            });
+            pdiv.append(img);
+            idiv.append("<p style = 'margin: 5px auto;'>Change Email</p>").append(email);
+            idiv.append("<p style = 'margin: 5px auto;'>Old Password</p>").append(oldpw);
+            idiv.append("<p style = 'margin: 5px auto;'>New Password</p>").append(newpw);
+            idiv.append("<p style = 'margin: 5px auto;'>Change Zip Code</p>").append(zip);
+            idiv.append(sub);
+            tempD.append(pdiv);
+            tempD.append(idiv)
             close.text("x");
             close.css({
                 "position": "absolute",
@@ -523,21 +823,90 @@ var mainApp = {};
                 "font-size": "50px",
                 "color": "grey",
                 "width": "50px",
-                "height": "50px"
+                "height": "50px",
+                "cursor": "crosshair",
             });
             close.attr("id", "close");
-            tempP.text(id);
-            temp.append(tempP).append(close);
+            temp.append(tempH).append(tempD).append(close);
             tempW.append(temp);
-            $("body").append(tempW).on("click", "#close", function () {
+
+            b.append(tempW);
+
+            b.on("click", "#close", function () {
                 $(this).parent().parent().remove();
                 body.css({
                     "opacity": "1",
                     "pointer-events": "auto",
                 });
             });
+
+            b.on("click", "#account-update", function() {
+
+                //zipcode Update
+                if(zip.val().length === 5){
+                    postal = zip.val();
+                    db.ref(uid).update({
+                        postal: zip.val(),
+                    });
+                }
+                else{
+                    console.log("NO ZIP INPUT");
+                }
+
+                //ReAuthenticate User && Email/PW update
+                const opw = oldpw.val().trim();
+                if(opw !== ""){
+                    firebase.auth().onAuthStateChanged(function(cuser) {
+                        if(cuser){
+                            //ReAuth
+                            let cred = firebase.auth.EmailAuthProvider.credential(
+                                cuser.email,
+                                opw
+                            );
+                            cuser.reauthenticateAndRetrieveDataWithCredential(cred).then(function() {
+                                console.log("USER REAUTHENTICATED!!!!!");
+                                //change email
+                                let einput = email.val().trim();
+                                if(einput.length > 0 ){
+                                    cuser.updateEmail(einput).then(function() {
+                                        //console.log("USER EMAIL HAS BEEN CHANGED TO: " + einput);
+                                    }).catch(function(e) {
+                                        console.log(e);
+                                    });
+                                }
+                            }).catch(function(e) {
+                                error(e.message);
+                           }).then(function() {
+                                //reAuth in case of new email
+                                const credpw = firebase.auth.EmailAuthProvider.credential(
+                                    cuser.email,
+                                    opw
+                                );
+                                cuser.reauthenticateAndRetrieveDataWithCredential(credpw).then(function() {
+                                    console.log("USER REAUTHENTICATED!!!!!");
+                                    //change password
+                                    let pinput = newpw.val().trim();
+                                    if(pinput.length > 0){
+                                        cuser.updatePassword(pinput);
+                                        //console.log("USER PASSWORD HAS BEEN CHANGED TO: " + pinput);
+                                    }
+                                });
+                            });
+                        }
+                        else{
+                            console.log("SOMETHING WENT WRONG");
+                            }
+                    });
+                }
+
+                $(this).parent().parent().parent().parent().remove();
+                body.css({
+                    "opacity": "1",
+                    "pointer-events": "auto",
+                });
+
+                refresh();
+            });
         });
-
     }
-
 })()
